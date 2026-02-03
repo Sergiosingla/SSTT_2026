@@ -42,7 +42,7 @@ def recibir_mensaje(cs):
         Leemos la información que nos llega. recv() devuelve un string con los datos.
     """
     try:
-        mensaje = cs.recv(BUFSIZE)      # Recibe hasta 1024 bytes
+        mensaje = cs.recv(BUFSIZE)      # Recibe hasta 8192 bytes
         if not mensaje:
             return None              # Conexión cerrada
         return mensaje.decode('utf-8')
