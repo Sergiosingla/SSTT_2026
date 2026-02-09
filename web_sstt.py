@@ -7,14 +7,14 @@ import select
 import types        # Para definir el tipo de datos data
 import argparse     # Leer parametros de ejecución
 import os           # Obtener ruta y extension
-from datetime import datetime, timedelta # Fechas de los mensajes HTTP
+from datetime import datetime, timedelta, timezone # Fechas de los mensajes HTTP
 import time         # Timeout conexión
 import sys          # sys.exit
 import re           # Analizador sintáctico
 import logging      # Para imprimir logs
 
 
-
+NOMBRE_ORGANIZACION = "proyectoSSTT0597.org" 
 BUFSIZE = 8192 # Tamaño máximo del buffer que se puede utilizar
 TIMEOUT_CONNECTION = 20 # Timout para la conexión persistente
 MAX_ACCESOS = 10
@@ -85,7 +85,77 @@ def process_web_request(cs, webroot):
             cerrar_conexion(cs)
             break
 
-        print("Datos:", data.decode())
+        #print("[DEBUG] Datos:", data)
+
+        lines = data.split("\r\n")
+
+        peticion = lines[0]
+        
+        pattern_http = r"(\S+)\s+(\S+)\s+HTTP/1\.1"
+
+        m = re.fullmatch(pattern_http, peticion)
+
+        if m:
+            metodo = m.group(1)
+            url = m.group(2)
+            print("[DEBUG] Método:", metodo)
+            print("[DEBUG] Ruta:", url)
+        else:                               #La peticion no es HTTP 1.1
+            enviar_mensaje(cs, "HTTP/1.1 400 Bad Request\r\n\r\n")
+            print("[DEBUG] 400 Bad Request ")
+            break
+        
+        # Comprobar metodo 
+        if metodo not in ["GET", "POST"]:
+            enviar_mensaje(cs, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")
+            break
+        
+        #URL sin parametros
+        url = url.split("?")[0]  
+
+        # URL default
+        if url == "/":
+            url = "/index.html"
+
+        print("[DEBUG] URL=",url)
+
+        ruta_absoluta = os.path.join(webroot, url.lstrip("/"))
+        
+        # Verificar que el recurso existe
+        if os.path.isfile(ruta_absoluta) == False:
+            enviar_mensaje(cs, "HTTP/1.1 404 Not Found\r\n\r\n")
+            break
+        
+
+        cabeceras={}
+        for linea in lines[1:]:
+            if ":" in linea:
+                clave, valor = linea.split(":",1)
+                cabeceras[clave.strip()] = valor.strip()
+                print(clave,":",valor)
+
+        new_cookie = process_cookies(cabeceras, cs)
+        #Verificar cookie
+        if 0 >= MAX_ACCESOS:
+            enviar_mensaje(cs, "HTTP/1.1 403 Forbidden")
+            break
+
+        content_length = os.stat(ruta_absoluta).st_size
+        content_type = os.path.basename(ruta_absoluta)
+        content_type = content_type.split(".")[1]
+
+        response_header ={
+            "HTTP/1.1 200 OK\r\n"
+            f"Date: {datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")}\r\n"
+            f"Server: {NOMBRE_ORGANIZACION}\r\n"
+            "Connection: keep-alive\r\n"
+            f"Set-Cookie = cookie_counter0597={new_cookie}\r\n"
+            f"Content-Length: {content_length}\r\n"
+            f"Content-Typte: {content_type}\r\n\r\n"
+        }
+
+
+
         
     """ Procesamiento principal de los mensajes recibidos.
         Típicamente se seguirá un procedimiento similar al siguiente (aunque el alumno puede modificarlo si lo desea)
@@ -164,24 +234,6 @@ def main():
 
                 clientSocket.close()  
 
-
-        """ Funcionalidad a realizar
-        * Crea un socket TCP (SOCK_STREAM)
-
-        * Permite reusar la misma dirección previamente vinculada a otro proceso. Debe ir antes de sock.bind
-        * Vinculamos el socket a una IP y puerto elegidos
-
-        * Escucha conexiones entrantes
-
-        * Bucle infinito para mantener el servidor activo indefinidamente
-            - Aceptamos la conexión
-
-            - Creamos un proceso hijo
-
-            - Si es el proceso hijo se cierra el socket del padre y procesar la petición con process_web_request()
-
-            - Si es el proceso padre cerrar el socket que gestiona el hijo.
-        """
     except KeyboardInterrupt:
         True
 
