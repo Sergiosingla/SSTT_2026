@@ -47,7 +47,7 @@ def recibir_mensaje(cs):
             return None              # Conexión cerrada
         return mensaje.decode('utf-8')
     except Exception as e:
-        print(f"Error al recibir mensaje: {e}")
+        print("Error al recibir mensaje: {}".format(e))
         return None
     
 
@@ -144,17 +144,24 @@ def process_web_request(cs, webroot):
         content_type = os.path.basename(ruta_absoluta)
         content_type = content_type.split(".")[1]
 
-        response_header ={
+        response_header = (
             "HTTP/1.1 200 OK\r\n"
-            f"Date: {datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")}\r\n"
-            f"Server: {NOMBRE_ORGANIZACION}\r\n"
+            "Date: {}\r\n"
+            "Server: {}\r\n"
             "Connection: keep-alive\r\n"
-            f"Set-Cookie = cookie_counter0597={new_cookie}\r\n"
-            f"Content-Length: {content_length}\r\n"
-            f"Content-Typte: {content_type}\r\n\r\n"
-        }
+            "Set-Cookie: cookie_counter0597={}\r\n"
+            "Content-Length: {}\r\n"
+            "Content-Type: {}\r\n\r\n"
+        ).format(
+            datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            NOMBRE_ORGANIZACION,
+            new_cookie,
+            content_length,
+            content_type
+        )
 
-
+        enviar_mensaje(cs, response_header)
+        break
 
         
     """ Procesamiento principal de los mensajes recibidos.
